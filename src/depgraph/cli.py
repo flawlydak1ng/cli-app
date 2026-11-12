@@ -7,7 +7,11 @@ from depgraph.errors import DepgraphError
 from depgraph.graph import build_graph
 from depgraph.model import Package
 from depgraph.nuget import NuGetRepository
-from depgraph.render import format_listing, format_reverse_listing
+from depgraph.render import (
+    format_ascii_tree,
+    format_plantuml,
+    format_reverse_listing,
+)
 from depgraph.reverse import reverse_neighbors
 from depgraph.testrepo import FileRepository
 from depgraph.versions import parse_version
@@ -15,6 +19,8 @@ from depgraph.versions import parse_version
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
+TREE_TITLE = "ASCII-дерево зависимостей:"
+REVERSE_TREE_TITLE = "ASCII-дерево обратных зависимостей:"
 
 
 def open_repository(config):
@@ -32,8 +38,15 @@ def root_package(config):
     return Package(config.package, version)
 
 
+def add_tree(lines, graph, config, title):
+    """Добавить ASCII-дерево к выводу, если задан параметр --ascii-tree."""
+    if config.ascii_tree:
+        lines = lines + ["", title, *format_ascii_tree(graph)]
+    return lines
+
+
 def run_direct(config):
-    """Построить граф прямых и транзитивных зависимостей пакета."""
+    """Построить граф зависимостей пакета и описать его на PlantUML."""
     repository = open_repository(config)
     graph = build_graph(
         repository.dependencies,
@@ -41,7 +54,7 @@ def run_direct(config):
         config.max_depth,
         config.substring,
     )
-    return format_listing(graph, config.max_depth, config.substring)
+    return add_tree(format_plantuml(graph), graph, config, TREE_TITLE)
 
 
 def run_reverse(config):
@@ -55,7 +68,8 @@ def run_reverse(config):
         config.max_depth,
         config.substring,
     )
-    return format_reverse_listing(graph, config.max_depth, config.substring)
+    lines = format_reverse_listing(graph, config.max_depth, config.substring)
+    return add_tree(lines, graph, config, REVERSE_TREE_TITLE)
 
 
 def run(config):

@@ -49,18 +49,35 @@ def test_args(package, filename, *extra):
 class RemoteModeTest(unittest.TestCase):
     """Режим remote на поддельном сервере NuGet."""
 
-    def test_transitive_graph_with_resolved_versions(self):
-        """Граф строится с учётом транзитивности, версии разрешаются.
+    def test_transitive_graph_as_plantuml(self):
+        """Граф строится с учётом транзитивности и описывается на PlantUML.
 
         У вершины берётся версия, которая встретилась при обходе первой:
         Gamma впервые запрошена из Beta как 2.5.0.
         """
         code, out, _ = run_main(remote_args("Alpha", "1.0"))
+        lines = out.splitlines()
         self.assertEqual(code, EXIT_OK)
-        self.assertIn("Граф зависимостей пакета Alpha 1.0.0:", out)
-        self.assertIn("Alpha 1.0.0 -> Beta 1.0.0, Gamma 2.5.0", out)
-        self.assertIn("Beta 1.0.0 -> Gamma 2.5.0", out)
-        self.assertIn("Gamma 2.5.0 (нет зависимостей)", out)
+        self.assertEqual(lines[0], "@startuml")
+        self.assertEqual(lines[-1], "@enduml")
+        self.assertIn('rectangle "Alpha 1.0.0" as n0 #LightBlue', lines)
+        self.assertIn('rectangle "Gamma 2.5.0" as n2', lines)
+        self.assertIn("n0 --> n1", lines)
+        self.assertIn("n1 --> n2", lines)
+        self.assertIn("n0 --> n2", lines)
+
+    def test_ascii_tree_on_request(self):
+        """Параметр --ascii-tree добавляет дерево после описания PlantUML."""
+        _, out, _ = run_main(remote_args("Alpha", "1.0.0", "--ascii-tree"))
+        head, _, tree = out.partition("ASCII-дерево зависимостей:\n")
+        self.assertTrue(head.rstrip().endswith("@enduml"))
+        self.assertIn("Alpha 1.0.0\n|-- Beta 1.0.0", tree)
+        self.assertIn("`-- Gamma 2.5.0", tree)
+
+    def test_no_tree_by_default(self):
+        """Без --ascii-tree дерево не печатается."""
+        _, out, _ = run_main(remote_args("Alpha", "1.0.0"))
+        self.assertNotIn("ASCII", out)
 
     def test_filter_removes_package(self):
         """Подстрока фильтрации исключает пакет из анализа."""
@@ -91,31 +108,29 @@ class TestModeTest(unittest.TestCase):
     def test_diamond(self):
         """Граф-ромб без циклов."""
         code, out, _ = run_main(test_args("A", "simple.txt"))
+        lines = out.splitlines()
         self.assertEqual(code, EXIT_OK)
-        self.assertIn("вершин 5, рёбер 5", out)
-        self.assertIn("A -> B, C", out)
-        self.assertIn("C -> D, E", out)
-        self.assertIn("Циклические зависимости: нет", out)
+        self.assertEqual(len([ln for ln in lines if ln.startswith("rect")]), 5)
+        self.assertIn("n0 --> n1", lines)
+        self.assertNotIn("цикл", out)
 
     def test_cycle_is_reported(self):
         """Циклическая зависимость обнаруживается и не зацикливает обход."""
         code, out, _ = run_main(test_args("A", "cycle.txt"))
         self.assertEqual(code, EXIT_OK)
-        self.assertIn("C -> A", out.split("замыкает цикл):")[1])
+        self.assertIn("n2 -[#red,dashed]-> n0 : цикл", out)
 
     def test_depth_limit(self):
         """Глубина ограничивает граф."""
         _, out, _ = run_main(test_args("A", "chain.txt", "--max-depth", "2"))
-        body = "\n".join(out.splitlines()[1:])
-        self.assertIn("C (достигнута максимальная глубина)", body)
-        self.assertNotIn("D", body)
+        self.assertIn('rectangle "C" as n2', out)
+        self.assertNotIn('"D"', out)
 
     def test_filter(self):
         """Фильтр исключает пакеты по подстроке."""
         _, out, _ = run_main(test_args("A", "simple.txt", "--filter", "D"))
-        body = "\n".join(out.splitlines()[1:])
-        self.assertIn("B (нет зависимостей)", body)
-        self.assertNotIn("D", body)
+        self.assertNotIn('"D"', out)
+        self.assertIn('"E"', out)
 
     def test_root_missing_in_file(self):
         """Корневого пакета нет в файле."""
@@ -139,6 +154,16 @@ class ReverseModeTest(unittest.TestCase):
         self.assertEqual(code, EXIT_OK)
         self.assertIn("Обратные зависимости пакета D", out)
         self.assertIn("D <- B, C", out)
+
+    def test_reverse_ascii_tree(self):
+        """Для обратных зависимостей тоже печатается ASCII-дерево."""
+        args = test_args("D", "simple.txt", "--reverse", "--ascii-tree")
+        _, out, _ = run_main(args)
+        tree = out.partition("ASCII-дерево обратных зависимостей:\n")[2]
+        self.assertEqual(
+            tree.splitlines(),
+            ["D", "|-- B", "|   `-- A", "`-- C", "    `-- A (см. выше)"],
+        )
 
     def test_reverse_unknown_package(self):
         """Заданного пакета нет в файле."""
