@@ -1,0 +1,24 @@
+# Служебные файлы Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Виртуальные окружения
+.venv/
+venv/
+
+# Настройки редакторов и IDE
+.vscode/
+.idea/
+*.swp
+
+# Артефакты сборки и результаты запусков
+build/
+dist/
+*.zip
+*.puml.png
+*.log
