@@ -6,6 +6,8 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
+from depgraph.versions import parse_version
+
 MODE_REMOTE = "remote"
 MODE_TEST = "test"
 REPO_MODES = (MODE_REMOTE, MODE_TEST)
@@ -16,9 +18,6 @@ MAX_ID_LENGTH = 100
 
 NUGET_ID_RE = re.compile(r"^[A-Za-z0-9_][A-Za-z0-9_.\-]*$")
 TEST_NAME_RE = re.compile(r"^[A-Z]+$")
-VERSION_RE = re.compile(
-    r"^\d+(\.\d+){0,3}(-[0-9A-Za-z.\-]+)?(\+[0-9A-Za-z.\-]+)?$"
-)
 BLANK_RE = re.compile(r"\s")
 
 ARGPARSE_MESSAGES = (
@@ -155,8 +154,10 @@ def check_version(version, repo_mode):
         if repo_mode == MODE_REMOTE:
             raise ConfigError("не задана версия пакета (--package-version)")
         return
-    if not VERSION_RE.match(version):
-        raise ConfigError(f"некорректная версия пакета '{version}'")
+    try:
+        parse_version(version)
+    except ValueError:
+        raise ConfigError(f"некорректная версия пакета '{version}'") from None
 
 
 def check_substring(substring):
