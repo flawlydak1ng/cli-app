@@ -3,47 +3,44 @@
 import sys
 
 from depgraph.config import MODE_TEST, ConfigError, parse_config
-from depgraph.errors import RepositoryError
+from depgraph.errors import DepgraphError
+from depgraph.graph import build_graph
+from depgraph.model import Package
 from depgraph.nuget import NuGetRepository
+from depgraph.render import format_listing
+from depgraph.testrepo import FileRepository
+from depgraph.versions import parse_version
 
 EXIT_OK = 0
 EXIT_ERROR = 1
 EXIT_USAGE = 2
-MAX_SHOWN_FRAMEWORKS = 3
 
 
-def format_frameworks(frameworks):
-    """Сократить список целевых платформ до нескольких первых."""
-    shown = ", ".join(frameworks[:MAX_SHOWN_FRAMEWORKS])
-    hidden = len(frameworks) - MAX_SHOWN_FRAMEWORKS
-    return f"{shown} и ещё {hidden}" if hidden > 0 else shown
+def open_repository(config):
+    """Создать репозиторий в соответствии с режимом работы."""
+    if config.repo_mode == MODE_TEST:
+        return FileRepository.from_file(config.repo)
+    return NuGetRepository(config.repo)
 
 
-def format_dependencies(package, version, dependencies):
-    """Представить прямые зависимости пакета в виде строк для вывода."""
-    title = f"Прямые зависимости пакета {package} {version}"
-    if not dependencies:
-        return [f"{title}: нет"]
-    lines = [f"{title} ({len(dependencies)}):"]
-    for dep in dependencies:
-        lines.append(
-            f"  {dep.name} {dep.version_range or '*'}"
-            f"  [платформы: {format_frameworks(dep.frameworks)}]"
-        )
-    return lines
+def root_package(config):
+    """Корневой пакет анализа; версия приводится к нормализованному виду."""
+    if not config.package_version:
+        return Package(config.package)
+    version = str(parse_version(config.package_version))
+    return Package(config.package, version)
 
 
 def run(config):
     """Выполнить анализ по параметрам и вернуть строки для вывода."""
-    if config.repo_mode == MODE_TEST:
-        raise RepositoryError("тестовый режим пока не поддерживается")
-    repository = NuGetRepository(config.repo)
-    dependencies = repository.direct_dependencies(
-        config.package, config.package_version
+    repository = open_repository(config)
+    graph = build_graph(
+        repository.dependencies,
+        root_package(config),
+        config.max_depth,
+        config.substring,
     )
-    return format_dependencies(
-        config.package, config.package_version, dependencies
-    )
+    return format_listing(graph, config.max_depth, config.substring)
 
 
 def main(argv=None):
@@ -55,7 +52,7 @@ def main(argv=None):
         return EXIT_USAGE
     try:
         lines = run(config)
-    except RepositoryError as error:
+    except DepgraphError as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return EXIT_ERROR
     for line in lines:

@@ -6,6 +6,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from depgraph.errors import PackageNotFoundError, RepositoryError
+from depgraph.model import Package
 from depgraph.nuspec import parse_dependencies
 from depgraph.versions import (
     lowest_match,
@@ -66,6 +67,7 @@ class NuGetRepository:
         self._fetch = fetch
         self._base_address = None
         self._versions = {}
+        self._dependencies = {}
 
     def base_address(self):
         """Адрес ресурса PackageBaseAddress из индекса службы."""
@@ -118,3 +120,17 @@ class NuGetRepository:
                 f"для '{name}' нет версии из диапазона '{version_range}'"
             )
         return str(chosen)
+
+    def dependencies(self, package):
+        """Прямые зависимости пакета с разрешёнными версиями (Package)."""
+        cache_key = (package.key, package.version)
+        if cache_key not in self._dependencies:
+            direct = self.direct_dependencies(package.name, package.version)
+            self._dependencies[cache_key] = [
+                Package(
+                    dep.name,
+                    self.resolve_version(dep.name, dep.version_range),
+                )
+                for dep in direct
+            ]
+        return self._dependencies[cache_key]
