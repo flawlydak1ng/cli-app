@@ -45,6 +45,7 @@ class Config:
     ascii_tree: bool
     max_depth: int
     substring: str
+    reverse: bool
 
 
 class ConfigParser(argparse.ArgumentParser):
@@ -113,6 +114,12 @@ def build_parser():
         default="",
         help="не учитывать пакеты, имя которых содержит эту подстроку",
     )
+    parser.add_argument(
+        "--reverse",
+        action="store_true",
+        help="вывести обратные зависимости пакета - пакеты, которые зависят "
+        "от него (только для --repo-mode test)",
+    )
     return parser
 
 
@@ -168,6 +175,16 @@ def check_substring(substring):
         )
 
 
+def check_reverse(reverse, repo_mode):
+    """Обратные зависимости доступны только в тестовом режиме."""
+    if reverse and repo_mode != MODE_TEST:
+        raise ConfigError(
+            "--reverse работает только с тестовым репозиторием "
+            "(--repo-mode test): NuGet не предоставляет списка пакетов, "
+            "зависящих от заданного"
+        )
+
+
 def parse_config(argv=None):
     """Разобрать и проверить аргументы, вернуть объект Config."""
     args = build_parser().parse_args(argv)
@@ -175,6 +192,7 @@ def parse_config(argv=None):
     check_repo(args.repo, args.repo_mode)
     check_version(args.package_version, args.repo_mode)
     check_substring(args.substring)
+    check_reverse(args.reverse, args.repo_mode)
     return Config(
         package=args.package,
         repo=args.repo,
@@ -183,4 +201,5 @@ def parse_config(argv=None):
         ascii_tree=args.ascii_tree,
         max_depth=args.max_depth,
         substring=args.substring,
+        reverse=args.reverse,
     )

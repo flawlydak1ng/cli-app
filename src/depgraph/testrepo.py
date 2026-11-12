@@ -77,10 +77,14 @@ class FileRepository:
         """Имена всех пакетов репозитория в порядке описания."""
         return list(self._graph)
 
-    def dependencies(self, package):
-        """Прямые зависимости пакета (список Package)."""
+    def check_package(self, package):
+        """Убедиться, что пакет описан в репозитории."""
         if package.name not in self._graph:
             raise PackageNotFoundError(
                 f"пакет '{package.name}' не найден в тестовом репозитории"
             )
+
+    def dependencies(self, package):
+        """Прямые зависимости пакета (список Package)."""
+        self.check_package(package)
         return [Package(name) for name in self._graph[package.name]]

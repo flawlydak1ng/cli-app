@@ -130,5 +130,35 @@ class TestModeTest(unittest.TestCase):
         self.assertIn("исключён", err)
 
 
+class ReverseModeTest(unittest.TestCase):
+    """Режим --reverse в тестовом репозитории."""
+
+    def test_reverse_dependencies(self):
+        """Печатаются пакеты, зависящие от заданного."""
+        code, out, _ = run_main(test_args("D", "simple.txt", "--reverse"))
+        self.assertEqual(code, EXIT_OK)
+        self.assertIn("Обратные зависимости пакета D", out)
+        self.assertIn("D <- B, C", out)
+
+    def test_reverse_unknown_package(self):
+        """Заданного пакета нет в файле."""
+        code, _, err = run_main(test_args("Z", "simple.txt", "--reverse"))
+        self.assertEqual(code, EXIT_ERROR)
+        self.assertIn("не найден в тестовом репозитории", err)
+
+    def test_reverse_excluded_root(self):
+        """Заданный пакет исключён подстрокой фильтрации."""
+        args = test_args("D", "simple.txt", "--reverse", "--filter", "D")
+        code, _, err = run_main(args)
+        self.assertEqual(code, EXIT_ERROR)
+        self.assertIn("исключён", err)
+
+    def test_reverse_requires_test_mode(self):
+        """В режиме remote --reverse - ошибка параметров."""
+        code, _, err = run_main(remote_args("Alpha", "1.0.0", "--reverse"))
+        self.assertEqual(code, EXIT_USAGE)
+        self.assertIn("--reverse работает только", err)
+
+
 if __name__ == "__main__":
     unittest.main()

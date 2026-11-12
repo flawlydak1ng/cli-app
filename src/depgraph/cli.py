@@ -7,7 +7,8 @@ from depgraph.errors import DepgraphError
 from depgraph.graph import build_graph
 from depgraph.model import Package
 from depgraph.nuget import NuGetRepository
-from depgraph.render import format_listing
+from depgraph.render import format_listing, format_reverse_listing
+from depgraph.reverse import reverse_neighbors
 from depgraph.testrepo import FileRepository
 from depgraph.versions import parse_version
 
@@ -31,8 +32,8 @@ def root_package(config):
     return Package(config.package, version)
 
 
-def run(config):
-    """Выполнить анализ по параметрам и вернуть строки для вывода."""
+def run_direct(config):
+    """Построить граф прямых и транзитивных зависимостей пакета."""
     repository = open_repository(config)
     graph = build_graph(
         repository.dependencies,
@@ -41,6 +42,27 @@ def run(config):
         config.substring,
     )
     return format_listing(graph, config.max_depth, config.substring)
+
+
+def run_reverse(config):
+    """Найти пакеты, зависящие от заданного, тем же обходом DFS."""
+    repository = open_repository(config)
+    root = root_package(config)
+    repository.check_package(root)
+    graph = build_graph(
+        reverse_neighbors(repository),
+        root,
+        config.max_depth,
+        config.substring,
+    )
+    return format_reverse_listing(graph, config.max_depth, config.substring)
+
+
+def run(config):
+    """Выполнить анализ по параметрам и вернуть строки для вывода."""
+    if config.reverse:
+        return run_reverse(config)
+    return run_direct(config)
 
 
 def main(argv=None):
