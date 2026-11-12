@@ -75,13 +75,8 @@ def parse_max_depth(text):
     return value
 
 
-def build_parser():
-    """Создать разборщик опций командной строки."""
-    parser = ConfigParser(
-        prog="depgraph",
-        description="Визуализация графа зависимостей пакетов NuGet.",
-        allow_abbrev=False,
-    )
+def add_source_options(parser):
+    """Добавить опции, описывающие пакет и репозиторий."""
     parser.add_argument("--package", help="имя анализируемого пакета")
     parser.add_argument(
         "--repo",
@@ -96,6 +91,10 @@ def build_parser():
         "test - файл тестового репозитория (по умолчанию remote)",
     )
     parser.add_argument("--package-version", help="версия пакета")
+
+
+def add_analysis_options(parser):
+    """Добавить опции, управляющие анализом и выводом."""
     parser.add_argument(
         "--ascii-tree",
         action="store_true",
@@ -120,6 +119,17 @@ def build_parser():
         help="вывести обратные зависимости пакета - пакеты, которые зависят "
         "от него (только для --repo-mode test)",
     )
+
+
+def build_parser():
+    """Создать разборщик опций командной строки."""
+    parser = ConfigParser(
+        prog="depgraph",
+        description="Визуализация графа зависимостей пакетов NuGet.",
+        allow_abbrev=False,
+    )
+    add_source_options(parser)
+    add_analysis_options(parser)
     return parser
 
 
